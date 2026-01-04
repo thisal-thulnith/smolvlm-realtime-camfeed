@@ -258,3 +258,4 @@ For issues or questions:
 **Status**: Production Ready 🚀
 **Version**: 1.0
 **Date**: 2025-12-31
+# smolvlm-realtime-camfeed
