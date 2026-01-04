@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTSP Camera Dashboard - SmolVLM</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .add-camera-section {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .add-camera-section h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 200px 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            color: #666;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        input {
+            padding: 12px 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .cameras-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+        }
+
+        .camera-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+
+        .camera-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .camera-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .camera-name {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .remove-btn {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .remove-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .video-container {
+            position: relative;
+            background: #1a1a1a;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .loading {
+            color: white;
+            font-size: 14px;
+        }
+
+        .analysis-section {
+            padding: 20px;
+        }
+
+        .analysis-label {
+            color: #667eea;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .analysis-text {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 60px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: white;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .examples {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .examples strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .examples ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .examples li {
+            padding: 4px 0;
+        }
+
+        @media (max-width: 768px) {
+            .input-group {
+                grid-template-columns: 1fr;
+            }
+
+            .cameras-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎥 RTSP Camera Dashboard</h1>
+            <div class="status">
+                <div class="status-dot"></div>
+                <span id="connection-status">Connecting to server...</span>
+            </div>
+        </header>
+
+        <div class="add-camera-section">
+            <h2>➕ Add New Camera</h2>
+            <div class="input-group">
+                <div class="form-field">
+                    <label for="camera-name">Camera Name</label>
+                    <input type="text" id="camera-name" placeholder="e.g., Front Door">
+                </div>
+                <div class="form-field">
+                    <label for="rtsp-url">RTSP URL or Webcam ID</label>
+                    <input type="text" id="rtsp-url" placeholder="rtsp://username:password@ip:port/stream or 0">
+                </div>
+                <button onclick="addCamera()">Add Camera</button>
+            </div>
+
+            <div class="examples">
+                <strong>Examples:</strong>
+                <ul>
+                    <li>• Webcam: <code>0</code> (default camera) or <code>1</code> (second camera)</li>
+                    <li>• RTSP: <code>rtsp://admin:password@192.168.1.100:554/stream1</code></li>
+                    <li>• HTTP: <code>http://192.168.1.100:8080/video</code></li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="cameras-container" class="cameras-grid">
+            <!-- Cameras will be added here dynamically -->
+        </div>
+
+        <div id="empty-state" class="empty-state">
+            <h3>No cameras added yet</h3>
+            <p>Add your first camera above to start monitoring</p>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const cameras = new Map();
+
+        // Connection handling
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.getElementById('connection-status').textContent = 'Connected to server';
+            loadCameras();
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            document.getElementById('connection-status').textContent = 'Disconnected - Reconnecting...';
+        });
+
+        // Frame updates
+        socket.on('frame_update', (data) => {
+            console.log('Frame received for', data.camera_id);
+            const img = document.getElementById(`frame-${data.camera_id}`);
+            if (img) {
+                img.src = 'data:image/jpeg;base64,' + data.frame;
+                // Show image and hide loading text
+                img.style.display = 'block';
+                const loading = img.parentElement.querySelector('.loading');
+                if (loading) loading.style.display = 'none';
+            }
+        });
+
+        // Analysis updates
+        socket.on('analysis_update', (data) => {
+            console.log('Analysis received for', data.camera_id, ':', data.analysis.substring(0, 50));
+            const analysis = document.getElementById(`analysis-${data.camera_id}`);
+            if (analysis) {
+                analysis.textContent = data.analysis;
+            }
+        });
+
+        // Load existing cameras
+        async function loadCameras() {
+            try {
+                const response = await fetch('/api/cameras');
+                const cameraList = await response.json();
+
+                if (cameraList.length > 0) {
+                    document.getElementById('empty-state').style.display = 'none';
+                    cameraList.forEach(camera => {
+                        addCameraToUI(camera);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading cameras:', error);
+            }
+        }
+
+        // Add camera
+        async function addCamera() {
+            const name = document.getElementById('camera-name').value.trim();
+            const url = document.getElementById('rtsp-url').value.trim();
+
+            if (!url) {
+                alert('Please enter an RTSP URL or webcam ID');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/cameras', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: name || undefined, url })
+                });
+
+                if (response.ok) {
+                    const camera = await response.json();
+                    addCameraToUI(camera);
+
+                    // Clear inputs
+                    document.getElementById('camera-name').value = '';
+                    document.getElementById('rtsp-url').value = '';
+
+                    document.getElementById('empty-state').style.display = 'none';
+                } else {
+                    alert('Failed to add camera');
+                }
+            } catch (error) {
+                console.error('Error adding camera:', error);
+                alert('Error adding camera');
+            }
+        }
+
+        // Add camera to UI
+        function addCameraToUI(camera) {
+            if (cameras.has(camera.id)) return;
+
+            cameras.set(camera.id, camera);
+
+            const card = document.createElement('div');
+            card.className = 'camera-card';
+            card.id = `camera-${camera.id}`;
+            card.innerHTML = `
+                <div class="camera-header">
+                    <div class="camera-name">${camera.name}</div>
+                    <button class="remove-btn" onclick="removeCamera('${camera.id}')">Remove</button>
+                </div>
+                <div class="video-container">
+                    <img id="frame-${camera.id}" alt="${camera.name}" style="display:none">
+                    <div class="loading">Loading stream...</div>
+                </div>
+                <div class="analysis-section">
+                    <div class="analysis-label">🤖 SmolVLM Analysis</div>
+                    <div class="analysis-text" id="analysis-${camera.id}">${camera.last_analysis || 'Analyzing...'}</div>
+                </div>
+            `;
+
+            document.getElementById('cameras-container').appendChild(card);
+
+            // Show image when loaded
+            const img = document.getElementById(`frame-${camera.id}`);
+            img.onload = function() {
+                this.style.display = 'block';
+                this.parentElement.querySelector('.loading').style.display = 'none';
+            };
+        }
+
+        // Remove camera
+        async function removeCamera(cameraId) {
+            if (!confirm('Remove this camera?')) return;
+
+            try {
+                const response = await fetch(`/api/cameras/${cameraId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    document.getElementById(`camera-${cameraId}`).remove();
+                    cameras.delete(cameraId);
+
+                    if (cameras.size === 0) {
+                        document.getElementById('empty-state').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Error removing camera:', error);
+            }
+        }
+
+        // Allow Enter key to add camera
+        document.getElementById('rtsp-url').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addCamera();
+        });
+    </script>
+</body>
+</html>

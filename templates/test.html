@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Camera Feed Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="log"></div>
+    <img id="video" style="max-width: 800px; border: 2px solid #000;">
+
+    <script>
+        const socket = io();
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        const video = document.getElementById('video');
+
+        function addLog(msg) {
+            const p = document.createElement('p');
+            p.textContent = new Date().toLocaleTimeString() + ': ' + msg;
+            log.appendChild(p);
+            console.log(msg);
+        }
+
+        socket.on('connect', () => {
+            status.textContent = 'Connected!';
+            status.style.color = 'green';
+            addLog('WebSocket connected');
+        });
+
+        socket.on('disconnect', () => {
+            status.textContent = 'Disconnected';
+            status.style.color = 'red';
+            addLog('WebSocket disconnected');
+        });
+
+        socket.on('frame_update', (data) => {
+            addLog(`Frame received for camera ${data.camera_id}, size: ${data.frame.length}`);
+            video.src = 'data:image/jpeg;base64,' + data.frame;
+        });
+
+        socket.on('analysis_update', (data) => {
+            addLog(`Analysis: ${data.analysis.substring(0, 50)}...`);
+        });
+
+        addLog('Page loaded, connecting...');
+    </script>
+</body>
+</html>
